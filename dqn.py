@@ -58,4 +58,5 @@ plt.plot(np.arange(len(scores1)), scores1)
 
 plt.ylabel('Score')
 plt.xlabel('Episode #')
+plt.title("DQN")
 plt.show()

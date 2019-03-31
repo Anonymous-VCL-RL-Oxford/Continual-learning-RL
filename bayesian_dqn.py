@@ -14,6 +14,7 @@ def dqn(agent=None, n_episodes=10000, max_t=1000, eps_start=1, eps_end=0.01, eps
     for i_episode in range(1, n_episodes + 1):
         state = env.reset()
         score = 0
+        eps = 0.0
         for t in range(max_t):
             action = agent.act(state, eps)
             next_state, reward, done, _ = env.step(action)
@@ -56,4 +57,5 @@ plt.plot(np.arange(len(scores1)), scores1)
 
 plt.ylabel('Score')
 plt.xlabel('Episode #')
+plt.title("Bayesian DQN")
 plt.show()

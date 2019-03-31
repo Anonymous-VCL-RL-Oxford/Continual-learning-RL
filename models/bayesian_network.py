@@ -46,8 +46,8 @@ class Bayesian_QNetwork(Cla_NN):
         m1, v1, hidden_size = self.create_weights(
              input_size, hidden_size, output_size, prev_means)
         self.no_samples = no_samples
-        self.no_samples_train = 100
-        self.no_samples_test = 10
+        self.no_samples_train = 1
+        self.no_samples_test = 1
         self.input_size = input_size
         self.out_size = output_size
         self.size = hidden_size
@@ -93,10 +93,8 @@ class Bayesian_QNetwork(Cla_NN):
 
 
         #self.optimizer = optim.Adam(self.weights, lr=learning_rate)
+        return
 
-    def get_loss(self, batch_x, actions, batch_y, task_idx = 0):
-
-        return - self._logpred_regression(batch_x, actions, batch_y, task_idx) #+ self._KL_term()/batch_x.shape[0]
 
     def _prediction(self, inputs, task_idx = 0, no_samples = None, noise = True):
         if no_samples == None:
@@ -207,6 +205,13 @@ class Bayesian_QNetwork(Cla_NN):
             mu_diff_term = 0.5 * torch.sum((torch.exp(v) + (m0 - m)**2) / v0)
             kl += const_term + log_std_diff + mu_diff_term
         return kl
+
+    def get_loss(self, batch_x, actions, batch_y, task_idx =0):
+        loss = - self._logpred_regression(batch_x, actions, batch_y, task_idx)
+        #loss += 2e-2 * self._KL_term()/batch_x.shape[0]
+
+        return loss
+
 
     def save_weights(self):
         ''' Save weights before training on the coreset before getting the test accuracy '''

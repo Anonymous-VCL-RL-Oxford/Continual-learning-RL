@@ -58,7 +58,7 @@ class BQ_learner():
         states, actions, rewards, next_states, dones = experiences
         actions = actions.long()
         ##TODO: check whether one need to not use the variance when computing the max(Q)
-        Q_targets_next = self.qnetwork_target.forward(next_states, no_samples=1, noise = False).detach().max(1)[0].unsqueeze(1)
+        Q_targets_next = self.qnetwork_target.forward(next_states, no_samples=1).detach().max(1)[0].unsqueeze(1)
         Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
 
         loss = self.qnetwork_local.get_loss(states, actions, Q_targets)
