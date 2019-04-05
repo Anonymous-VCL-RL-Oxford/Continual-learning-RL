@@ -57,11 +57,18 @@ class BQ_learner():
     def learn(self, experiences, gamma):
         states, actions, rewards, next_states, dones = experiences
         actions = actions.long()
-        ##TODO: check whether one need to not use the variance when computing the max(Q)
-        Q_targets_next = self.qnetwork_target.forward(next_states, no_samples=1).detach().max(1)[0].unsqueeze(1)
-        Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
+        ##TODO: sample different parameters for each element from the batch
+        no_samples_Q_target = 10
+        Q_targets_next = self.qnetwork_target.forward(next_states, no_samples=no_samples_Q_target).view(-1,2).detach().max(1)[0].unsqueeze(1)
+        Q_targets = rewards.repeat([no_samples_Q_target,1]) + (gamma * Q_targets_next * (1 - dones.repeat([no_samples_Q_target,1])))
 
-        loss = self.qnetwork_local.get_loss(states, actions, Q_targets)
+        #unparallelized
+        """
+        no_samples_Q_target = 1
+        Q_targets_next = self.qnetwork_target.forward_diff_params(next_states, no_samples=1).detach().max(1)[0].unsqueeze(1)
+        Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
+        """
+        loss = self.qnetwork_local.get_loss(states, actions, Q_targets, no_samples_Q_target)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from agents.q_learner import Q_learner
 
 
-def dqn(agent=None, n_episodes=10000, max_t=1000, eps_start=1, eps_end=0.01, eps_decay=0.995):
+def dqn(agent=None, n_episodes=10000, max_t=200, eps_start=1, eps_end=0.01, eps_decay=0.995):
     scores = []  # list containing scores from each episode
     scores_window = deque(maxlen=100)  # last 100 scores
     eps = eps_start  # initialize epsilon
@@ -29,7 +29,7 @@ def dqn(agent=None, n_episodes=10000, max_t=1000, eps_start=1, eps_end=0.01, eps
         print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)), end="")
         if i_episode % 100 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
-        if np.mean(scores_window) >= 200.0:
+        if np.mean(scores_window) >= 195.0:
             print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}'.format(i_episode - 100,
                                                                                          np.mean(scores_window)))
             torch.save(agent.qnetwork_local.state_dict(), 'models/checkpoints/checkpoint.pth')
@@ -39,7 +39,7 @@ def dqn(agent=None, n_episodes=10000, max_t=1000, eps_start=1, eps_end=0.01, eps
 args = dict()
 args["BUFFER_SIZE"] = int(500)  # replay buffer size
 args["BATCH_SIZE"] = 32  # minibatch size
-args["GAMMA"] = 0.95  # discount factor
+args["GAMMA"] = 1  # discount factor
 args["TAU"] = 1e-3  # for soft update of target parameters
 args["LR"] = 0.001  # learning rate
 args["UPDATE_EVERY"] = 4  # how often to update the network
