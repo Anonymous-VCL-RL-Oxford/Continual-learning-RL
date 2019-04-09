@@ -1,6 +1,6 @@
 ###THIS CODE HAS BEEN MOSTLY RETRIEVED ON THE GITHUB OF NITARSHAN"
 #https://github.com/nitarshan/bayes-by-backprop/blob/master/Weight%20Uncertainty%20in%20Neural%20Networks.ipynb
-
+import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -10,6 +10,17 @@ from scipy.stats import truncnorm
 from copy import deepcopy
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 truncated = False
+
+#variance_variational_distribution = 0 ##exp of this value is the variance
+variance_prior_distribution = 10000
+init_prior = [-10000,10000]
+
+def init_variational_variance(dout, din=1, variable = True):
+    stdv = np.log(1 / dout)
+    X_tensor =  stdv * torch.ones([din, dout]).to(device=device)
+    X_tensor.requires_grad = variable
+    return X_tensor
+
 
 def truncated_normal(size, stddev=1, variable = False, mean=0):
     if not truncated:
@@ -111,8 +122,6 @@ class Bayesian_QNetwork(Cla_NN):
             eps_b = torch.normal(torch.zeros((K, 1, dout)), torch.ones((K, 1, dout))).to(device = device)
             weights = torch.add(eps_w * torch.exp(0.5*self.W_v[i]), self.W_m[i])
             biases = torch.add(eps_b * torch.exp(0.5*self.b_v[i]), self.b_m[i])
-
-
             pre = torch.add(torch.einsum('mni,mio->mno', act, weights), biases)
             act = F.relu(pre)
 
@@ -127,8 +136,7 @@ class Bayesian_QNetwork(Cla_NN):
         btask_v = self.b_last_v[task_idx]
 
         weights = torch.add(eps_w * torch.exp(0.5 * Wtask_v), Wtask_m)
-        biases = torch.add(eps_b * torch.exp(0.5 * btask_v), btask_m[i])
-
+        biases = torch.add(eps_b * torch.exp(0.5 * btask_v), btask_m)
         act = torch.unsqueeze(act, 3)
         weights = torch.unsqueeze(weights, 1)
         pre = torch.add(torch.sum(act * weights, dim = 2), biases)
@@ -148,13 +156,14 @@ class Bayesian_QNetwork(Cla_NN):
     def _logpred_regression(self, inputs, actions, targets, no_samples = None, task_idx = 0):
         pred = self._prediction(inputs, task_idx, self.no_samples_train).view(-1, self.out_size)
         pred_max = pred.gather(1, actions).repeat([no_samples, 1])
-       # targets = targets.repeat([self.no_samples_train, 1])
+
+
+        # targets = targets.repeat([self.no_samples_train, 1])
         log_lik = - torch.mean((pred_max - targets)**2)
         return log_lik
 
 
     def _logpred_classification(self, inputs, targets, task_idx):
-        """not needed in the RL case (regression)"""
         loss = torch.nn.CrossEntropyLoss()
         pred = self._prediction(inputs, task_idx, self.no_samples).view(-1,self.out_size)
         targets = targets.repeat([self.no_samples, 1]).view(-1)
@@ -170,7 +179,6 @@ class Bayesian_QNetwork(Cla_NN):
             dout = self.size[i+1]
             m, v = self.W_m[i], self.W_v[i]
             m0, v0 = self.prior_W_m[i], self.prior_W_v[i]
-
             const_term = -0.5 * dout * din
             log_std_diff = 0.5 * torch.sum(torch.log(v0) - v)
             mu_diff_term = 0.5 * torch.sum((torch.exp(v) + (m0 - m)**2) / v0)
@@ -191,7 +199,6 @@ class Bayesian_QNetwork(Cla_NN):
         for i in range(no_tasks):
             m, v = self.W_last_m[i], self.W_last_v[i]
             m0, v0 = self.prior_W_last_m[i], self.prior_W_last_v[i]
-
             const_term = - 0.5 * dout * din
             log_std_diff = 0.5 * torch.sum(torch.log(v0) - v)
             mu_diff_term = 0.5 * torch.sum((torch.exp(v) + (m0 - m)**2) / v0)
@@ -208,10 +215,11 @@ class Bayesian_QNetwork(Cla_NN):
 
     def get_loss(self, batch_x, actions, batch_y, no_samples, task_idx =0):
         likelihood = self._logpred_regression(batch_x, actions, batch_y, no_samples)
-        Lambda = 0.01/batch_x.shape[0]
+        Lambda = 1e-4/batch_x.shape[0]
         kl =  self._KL_term()
-        loss = - likelihood + Lambda * kl
-        #print("loss:{}, like:{}, kl:{}".format(loss.data, likelihood.data,kl.data ))
+        loss = - likelihood #+ Lambda * kl
+        #print("loss:{}".format(loss.data))
+        #print("loss:{}, like:{}, kl:{}".format(loss.data, likelihood.data, kl.data ))
         return loss
 
 
@@ -304,10 +312,10 @@ class Bayesian_QNetwork(Cla_NN):
         din = self.size[-2]
         dout = self.size[-1]
 
-        W_m= truncated_normal([din, dout], stddev=0.1, variable=True)
-        b_m= truncated_normal([dout], stddev=0.1, variable=True)
-        W_v = init_tensor(0,  dout = dout, din = din, variable= True)
-        b_v = init_tensor(0,  dout = dout, variable= True)
+        W_m= init_tensor(0, dout=dout, din=din, variable=True)
+        b_m= init_tensor(0, dout=dout, variable=True)
+        W_v = init_variational_variance(dout = dout, din = din, variable= True)
+        b_v = init_variational_variance(dout = dout, variable= True)
 
         self.W_last_m.append(W_m)
         self.W_last_v.append(W_v)
@@ -315,10 +323,10 @@ class Bayesian_QNetwork(Cla_NN):
         self.b_last_v.append(b_v)
 
 
-        W_m_p = torch.zeros([din, dout]).to(device = device)
-        b_m_p = torch.zeros([dout]).to(device = device)
-        W_v_p =  init_tensor(0,  dout = dout, din = din)
-        b_v_p = init_tensor(0, dout = dout)
+        W_m_p = torch.zeros([din, dout]).uniform_(init_prior[0], init_prior[1]).to(device = device)
+        b_m_p = torch.zeros([dout]).uniform_(init_prior[0], init_prior[1]).to(device = device)
+        W_v_p =  init_tensor(variance_prior_distribution,  dout = dout, din = din)
+        b_v_p = init_tensor(variance_prior_distribution, dout = dout)
 
         self.prior_W_last_m.append(W_m_p)
         self.prior_W_last_v.append(W_v_p)
@@ -342,21 +350,28 @@ class Bayesian_QNetwork(Cla_NN):
         print("initializing first head")
         din = self.size[-2]
         dout = self.size[-1]
-        self.prior_W_last_m = [torch.zeros([din, dout]).to(device = device)]
-        self.prior_b_last_m = [torch.zeros([dout]).to(device = device)]
-        self.prior_W_last_v =  [init_tensor(1,  dout = dout, din = din)]
-        self.prior_b_last_v = [init_tensor(1, dout = dout)]
+        self.prior_W_last_m = [torch.zeros([din, dout]).uniform_(init_prior[0], init_prior[1]).to(device = device)]
+        self.prior_b_last_m = [torch.zeros([dout]).uniform_(init_prior[0], init_prior[1]).to(device = device)]
+        self.prior_W_last_v =  [init_tensor(variance_prior_distribution,  dout = dout, din = din)]
+        self.prior_b_last_v = [init_tensor(variance_prior_distribution, dout = dout)]
 
-        W_last_m = prev_means[2][0].detach().data
-        W_last_m.requires_grad = True
+
+
+        if prev_means is None:
+            W_last_m = init_tensor(0,  dout = dout, din = din, variable=True)
+            b_last_m = init_tensor(0,  dout = dout,  variable=True)
+        else:
+            W_last_m = prev_means[2][0].detach().data
+            W_last_m.requires_grad = True
+
+            b_last_m = prev_means[3][0].detach().data
+            b_last_m.requires_grad = True
+
         self.W_last_m = [W_last_m]
-        self.W_last_v = [init_tensor(0,  dout = dout, din = din, variable= True)]
+        self.W_last_v = [init_variational_variance(dout = dout, din = din, variable= True)]
 
-
-        b_last_m = prev_means[3][0].detach().data
-        b_last_m.requires_grad = True
         self.b_last_m = [b_last_m]
-        self.b_last_v = [init_tensor(0, dout = dout, variable= True)]
+        self.b_last_v = [init_variational_variance(dout = dout, din = din, variable= True)]
 
         return
 
@@ -375,17 +390,18 @@ class Bayesian_QNetwork(Cla_NN):
             din = hidden_size[i]
             dout = hidden_size[i+1]
             if prev_means is not None:
+                """ just used when we train a Vanilla NN to get a good initialization """
                 W_m_i = prev_means[0][i].detach().data
                 W_m_i.requires_grad = True
                 bi_m_i = prev_means[1][i].detach().data
                 bi_m_i.requires_grad = True
             else:
             #Initializiation values of means
-                W_m_i= truncated_normal([din, dout], stddev=0.1, variable=True)
-                bi_m_i= truncated_normal([dout], stddev=0.1, variable=True)
+                W_m_i=  init_tensor(0, dout = dout, din = din, variable = True) ##truncated_normal([din, dout], stddev=0.1, variable=True)
+                bi_m_i= init_tensor(0, dout = dout, variable = True) ##truncated_normal([dout], stddev=0.1, variable=True)
             #Initializiation values of variances
-            W_v_i = init_tensor(0,  dout = dout, din = din, variable = True)
-            bi_v_i = init_tensor(0,  dout = dout, variable = True)
+            W_v_i = init_variational_variance(dout = dout, din = din, variable = True)
+            bi_v_i = init_variational_variance(dout = dout, variable = True)
 
             #Append to list weights
             W_m.append(W_m_i)
@@ -409,12 +425,12 @@ class Bayesian_QNetwork(Cla_NN):
             dout = hidden_size[i + 1]
 
             # Initializiation values of means
-            W_m_val = initial_mean * torch.zeros([din, dout]).to(device = device)
-            bi_m_val = initial_mean * torch.zeros([dout]).to(device = device)
+            W_m_val = torch.zeros([din, dout]).uniform_(init_prior[0], init_prior[1]).to(device = device)
+            bi_m_val = torch.zeros([dout]).uniform_(init_prior[0], init_prior[1]).to(device = device)
 
             # Initializiation values of variances
-            W_v_val = initial_variance * init_tensor(1,  dout = dout, din = din )
-            bi_v_val =  initial_variance * init_tensor(1,  dout = dout)
+            W_v_val = init_tensor(variance_prior_distribution,  dout = dout, din = din )
+            bi_v_val =  init_tensor(variance_prior_distribution,  dout = dout)
 
             # Append to list weights
             W_m.append(W_m_val)

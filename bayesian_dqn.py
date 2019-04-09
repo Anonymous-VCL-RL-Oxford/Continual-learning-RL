@@ -7,14 +7,14 @@ import matplotlib.pyplot as plt
 from agents.bq_learner import BQ_learner
 
 
-def dqn(agent=None, n_episodes=10000, max_t=200, eps_start=1, eps_end=0.01, eps_decay=0.995):
+def dqn(agent=None, n_episodes=2000, max_t=200, eps_start=1, eps_end=0.01, eps_decay=0.995):
     scores = []  # list containing scores from each episode
     scores_window = deque(maxlen=100)  # last 100 scores
     eps = eps_start  # initialize epsilon
     for i_episode in range(1, n_episodes + 1):
         state = env.reset()
         score = 0
-        eps = 0
+        #eps = 0
         for t in range(max_t):
             action = agent.act(state, eps)
             next_state, reward, done, _ = env.step(action)

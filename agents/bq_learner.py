@@ -11,6 +11,12 @@ import torch.optim as optim
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+try:
+    from torchviz import make_dot, make_dot_from_trace
+except ImportError:
+    print("Torchviz was not found.")
+
+
 
 class BQ_learner():
 
@@ -25,6 +31,7 @@ class BQ_learner():
         self.UPDATE_EVERY = args["UPDATE_EVERY"]
         self.LR = args["LR"]
         self.TAU = args["TAU"]
+        self.print_graph_bol = False
 
 
         self.qnetwork_local = Bayesian_QNetwork(state_size, action_size, hiddens, seed)
@@ -50,7 +57,8 @@ class BQ_learner():
             action_values = self.qnetwork_local.forward(state, no_samples = self.qnetwork_local.no_samples_test)
 
         if random.random() > eps:
-            return np.argmax(action_values.cpu().data.numpy())
+            act = np.argmax(action_values.cpu().data.numpy())
+            return act
         else:
             return random.choice(np.arange(self.action_size))
 
@@ -58,17 +66,25 @@ class BQ_learner():
         states, actions, rewards, next_states, dones = experiences
         actions = actions.long()
         ##TODO: sample different parameters for each element from the batch
-        no_samples_Q_target = 10
+        no_samples_Q_target = 1
         Q_targets_next = self.qnetwork_target.forward(next_states, no_samples=no_samples_Q_target).view(-1,2).detach().max(1)[0].unsqueeze(1)
         Q_targets = rewards.repeat([no_samples_Q_target,1]) + (gamma * Q_targets_next * (1 - dones.repeat([no_samples_Q_target,1])))
-
-        #unparallelized
         """
+        #unparallelized
+
+
         no_samples_Q_target = 1
         Q_targets_next = self.qnetwork_target.forward_diff_params(next_states, no_samples=1).detach().max(1)[0].unsqueeze(1)
         Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
-        """
+"""
         loss = self.qnetwork_local.get_loss(states, actions, Q_targets, no_samples_Q_target)
+
+        if self.print_graph_bol:
+            # Just if you want to see the computational graph
+             # mf_model.get_loss(torch.Tensor(x_train).to(device), torch.Tensor(y_train).to(device), task_id), params=params)
+            print_graph(self.qnetwork_local, loss)
+            self.print_graph_bol = False
+
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -78,3 +94,30 @@ class BQ_learner():
     def soft_update(self, local_model, target_model, tau):
         for target_param, local_param in zip(target_model.weights, local_model.weights):
             target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)
+
+def print_graph(model, output):
+    params = dict()
+    for i in range(len(model.W_m)):
+        params["W_m{}".format(i)] = model.W_m[i]
+        params["W_v{}".format(i)] = model.W_v[i]
+        params["b_m{}".format(i)] = model.b_m[i]
+        params["b_v{}".format(i)] = model.b_v[i]
+        params["prior_W_m".format(i)] = model.prior_W_m[i]
+        params["prior_W_v".format(i)] = model.prior_W_v[i]
+        params["prior_b_m".format(i)] = model.prior_b_m[i]
+        params["prior_b_v".format(i)] = model.prior_b_v[i]
+
+    for i in range(len(model.W_last_m)):
+         params["W_last_m".format(i)] = model.W_last_m[i]
+         params["W_last_v".format(i)] = model.W_last_v[i]
+         params["b_last_m".format(i)] = model.b_last_m[i]
+         params["b_last_v".format(i)] = model.b_last_v[i]
+         params["prior_W_last_m".format(i)] = model.prior_W_last_m[i]
+         params["prior_W_last_v".format(i)] = model.prior_W_last_v[i]
+         params["prior_b_last_m".format(i)] = model.prior_b_last_m[i]
+         params["prior_b_last_v".format(i)] = model.prior_b_last_v[i]
+    dot = make_dot(output, params=params)
+    dot.view()
+
+    return
+
