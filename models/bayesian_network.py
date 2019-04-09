@@ -21,6 +21,11 @@ def init_variational_variance(dout, din=1, variable = True):
     X_tensor.requires_grad = variable
     return X_tensor
 
+def init_variational_mean(dout, din=1):
+    stdv = np.sqrt(1 / dout)
+    X_tensor = torch.ones([din, dout]).uniform_(-stdv, stdv).to(device=device)
+    X_tensor.requires_grad = True
+    return X_tensor
 
 def truncated_normal(size, stddev=1, variable = False, mean=0):
     if not truncated:
@@ -120,8 +125,8 @@ class Bayesian_QNetwork(Cla_NN):
             dout = self.size[i+1]
             eps_w = torch.normal(torch.zeros((K, din, dout)), torch.ones((K, din, dout))).to(device = device)
             eps_b = torch.normal(torch.zeros((K, 1, dout)), torch.ones((K, 1, dout))).to(device = device)
-            weights = torch.add(eps_w * torch.exp(0.5*self.W_v[i]), self.W_m[i])
-            biases = torch.add(eps_b * torch.exp(0.5*self.b_v[i]), self.b_m[i])
+            weights = torch.add(1* eps_w * torch.exp(0.5*self.W_v[i]), self.W_m[i])
+            biases = torch.add( 1* eps_b * torch.exp(0.5*self.b_v[i]), self.b_m[i])
             pre = torch.add(torch.einsum('mni,mio->mno', act, weights), biases)
             act = F.relu(pre)
 
@@ -135,8 +140,8 @@ class Bayesian_QNetwork(Cla_NN):
         btask_m = self.b_last_m[task_idx]
         btask_v = self.b_last_v[task_idx]
 
-        weights = torch.add(eps_w * torch.exp(0.5 * Wtask_v), Wtask_m)
-        biases = torch.add(eps_b * torch.exp(0.5 * btask_v), btask_m)
+        weights = torch.add(1* eps_w * torch.exp(0.5 * Wtask_v), Wtask_m)
+        biases = torch.add(1 * eps_b * torch.exp(0.5 * btask_v), btask_m)
         act = torch.unsqueeze(act, 3)
         weights = torch.unsqueeze(weights, 1)
         pre = torch.add(torch.sum(act * weights, dim = 2), biases)
@@ -156,8 +161,6 @@ class Bayesian_QNetwork(Cla_NN):
     def _logpred_regression(self, inputs, actions, targets, no_samples = None, task_idx = 0):
         pred = self._prediction(inputs, task_idx, self.no_samples_train).view(-1, self.out_size)
         pred_max = pred.gather(1, actions).repeat([no_samples, 1])
-
-
         # targets = targets.repeat([self.no_samples_train, 1])
         log_lik = - torch.mean((pred_max - targets)**2)
         return log_lik
@@ -312,8 +315,8 @@ class Bayesian_QNetwork(Cla_NN):
         din = self.size[-2]
         dout = self.size[-1]
 
-        W_m= init_tensor(0, dout=dout, din=din, variable=True)
-        b_m= init_tensor(0, dout=dout, variable=True)
+        W_m= init_variational_mean(dout = dout, din = din)
+        b_m= init_variational_mean(dout = dout)
         W_v = init_variational_variance(dout = dout, din = din, variable= True)
         b_v = init_variational_variance(dout = dout, variable= True)
 
@@ -397,8 +400,8 @@ class Bayesian_QNetwork(Cla_NN):
                 bi_m_i.requires_grad = True
             else:
             #Initializiation values of means
-                W_m_i=  init_tensor(0, dout = dout, din = din, variable = True) ##truncated_normal([din, dout], stddev=0.1, variable=True)
-                bi_m_i= init_tensor(0, dout = dout, variable = True) ##truncated_normal([dout], stddev=0.1, variable=True)
+                W_m_i=  init_variational_mean(dout = dout, din = din) ##truncated_normal([din, dout], stddev=0.1, variable=True)
+                bi_m_i= init_variational_mean(dout = dout) ##truncated_normal([dout], stddev=0.1, variable=True)
             #Initializiation values of variances
             W_v_i = init_variational_variance(dout = dout, din = din, variable = True)
             bi_v_i = init_variational_variance(dout = dout, variable = True)

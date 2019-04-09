@@ -49,7 +49,6 @@ class Q_learner():
         self.qnetwork_local.eval()
         with torch.no_grad():
             action_values = self.qnetwork_local(state)
-            print(action_values)
         self.qnetwork_local.train()
 
         if random.random() > eps:

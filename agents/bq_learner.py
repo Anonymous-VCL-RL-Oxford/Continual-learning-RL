@@ -50,7 +50,6 @@ class BQ_learner():
                 self.learn(experiences, self.GAMMA)
 
     def act(self, state, eps=0.):
-
         state = torch.from_numpy(state).float().unsqueeze(0).to(device)
 
         with torch.no_grad():
