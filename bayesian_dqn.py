@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from agents.bq_learner import BQ_learner
 
 
-def dqn(agent=None, n_episodes=4000, max_t=200, eps_start=1, eps_end=0.01, eps_decay=0.995):
+def dqn(agent=None, n_episodes=10000, max_t=200, eps_start=1, eps_end=0.01, eps_decay=0.995):
     scores = []  # list containing scores from each episode
     scores_window = deque(maxlen=100)  # last 100 scores
     eps = eps_start  # initialize epsilon

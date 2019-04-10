@@ -42,7 +42,7 @@ class Q_learner():
                 experiences = self.memory.sample()
                 self.learn(experiences, self.GAMMA)
 
-    def act(self, state, eps=0.):
+    def act(self, state, task_idx = 0, eps=0.):
 
         state = torch.from_numpy(state).float().unsqueeze(0).to(device)
 
@@ -74,3 +74,16 @@ class Q_learner():
     def soft_update(self, local_model, target_model, tau):
         for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
             target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)
+        
+    
+    def get_weights(self):
+        W_m , b_m = [],[]
+        for name, param in self.qnetwork_local.named_parameters():
+            if name.split(".")[-1] == "weight":
+                W_m.append(torch.t(param).data)
+            else:
+                b_m.append(torch.unsqueeze(param,0).data)
+        W_last_m , b_last_m = W_m[-1], b_m[-1]
+        W_m, b_m =  W_m[:-1], b_m[:-1]
+        return [W_m, b_m, [W_last_m], [b_last_m]]
+                                      
