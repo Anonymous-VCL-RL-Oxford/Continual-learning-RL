@@ -134,12 +134,12 @@ class Bayesian_QNetwork(Cla_NN):
         mean_var = 0
         nbr = 0
         for i in range(len(self.W_v)):
-            mean_var += np.exp(self.W_v[i].mean(0).mean(0).data.cpu().numpy())
-            mean_var += np.exp(self.b_v[i].mean(0).mean(0).data.cpu().numpy())
+            mean_var += torch.div(torch.abs(self.W_m[i]),torch.exp(self.W_v[i]*0.5)).mean(0).mean(0).data.cpu().numpy()
+            mean_var += torch.div(torch.abs(self.b_m[i]),torch.exp(self.b_v[i]*0.5)).mean(0).mean(0).data.cpu().numpy()
             nbr+=1
         for j in range(len(self.W_last_v)):
-            mean_var += np.exp(self.W_last_v[j].mean(0).mean(0).data.cpu().numpy())
-            mean_var += np.exp(self.b_last_v[j].mean(0).mean(0).data.cpu().numpy())
+            mean_var += torch.div(torch.abs(self.W_last_m[j]),torch.exp(self.W_last_v[j]*0.5)).mean(0).mean(0).data.cpu().numpy()
+            mean_var += torch.div(torch.abs(self.b_last_m[j]),torch.exp(self.b_last_v[j]*0.5)).mean(0).mean(0).data.cpu().numpy()
             nbr += 1
         return mean_var/nbr
 
