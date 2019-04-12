@@ -24,3 +24,11 @@ These are really interesting results!  Let’s see how we can interpret them.
 ![](/results/pictures/result_test_v1.png)
 
 
+The VCL agent still has too be fixed. The exploration seems not to work.
+
+![](/results/pictures/VDQN/vdqn_200steps_learning.png)
+![](/results/pictures/VDQN/vdqn_200steps_meanvar.png)
+
+![](/results/pictures/VDQN/vdqn_1000steps_learning.png)
+![](/results/pictures/VDQN/vdqn_1000steps_meanvar.png)
+
